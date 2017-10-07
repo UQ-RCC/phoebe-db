@@ -2,10 +2,8 @@ create or replace function insert_image(
     in v_directory text,
     in v_original_filename text,
     in v_channel_number integer,
-    in v_channel_name text,
-    in v_filname uuid,    
-    in v_sequence integer,
-    out v_id bigint) as
+    in v_channel_name text,    
+    in v_msec integer) returns void as
 $$
 declare
     v_experiment_id bigint;
@@ -32,9 +30,8 @@ begin
         returning id into v_channel_id;
     end if;
 
-    insert into image_frame(channel_id, sequence, filename, original_filename)
-    values (v_channel_id, v_sequence, v_filename, v_original_filename)
-    returning id into v_id;
+    insert into image_frame(channel_id, msec, filename, original_filename, status)
+    values (v_channel_id, v_msec, uuid_generate_v4(), v_original_filename, 'scanned');
 
 end;
 $$

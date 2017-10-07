@@ -1,1 +1,1 @@
-select * from insert_image('d4', 'fname', 0, 'chan 0',  uuid_generate_v4(), 0);
+select insert_image('d0', 'fname', 0, 'chan 0', 0);

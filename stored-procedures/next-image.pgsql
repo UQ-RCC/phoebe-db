@@ -8,13 +8,13 @@ $$
 begin
     update image_frame f set status = 'processing'
     from image_view iv
-    where id = (
+    where f.id = (
         select id from image_frame
         where status = 'scanned'
         order by id limit 1 for update
     )
     and f.id = iv.id
-    returning f.id, iv.directory, f.originale_filename, f.filename
+    returning f.id, iv.directory, f.original_filename, f.filename
     into v_id, v_directory, v_original_filename, v_filename;
 end;
 $$

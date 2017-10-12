@@ -45,10 +45,26 @@ COMMENT ON EXTENSION "uuid-ossp" IS 'generate universally unique identifiers (UU
 SET search_path = public, pg_catalog;
 
 --
--- Name: insert_image(text, text, integer, text, uuid, integer); Type: FUNCTION; Schema: public; Owner: phoebeadmin
+-- Name: complete_image(bigint); Type: FUNCTION; Schema: public; Owner: phoebeadmin
 --
 
-CREATE FUNCTION insert_image(v_directory text, v_original_filename text, v_channel_number integer, v_channel_name text, v_filename uuid, v_sequence integer, OUT v_id bigint) RETURNS bigint
+CREATE FUNCTION complete_image(v_id bigint) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+begin
+    update image_frame set status = 'complete'
+    where id = v_id;
+end;
+$$;
+
+
+ALTER FUNCTION public.complete_image(v_id bigint) OWNER TO phoebeadmin;
+
+--
+-- Name: insert_image(text, text, integer, text, integer); Type: FUNCTION; Schema: public; Owner: phoebeadmin
+--
+
+CREATE FUNCTION insert_image(v_directory text, v_original_filename text, v_channel_number integer, v_channel_name text, v_msec integer) RETURNS void
     LANGUAGE plpgsql
     AS $$
 declare
@@ -76,15 +92,64 @@ begin
         returning id into v_channel_id;
     end if;
 
-    insert into image_frame(channel_id, sequence, filename, original_filename)
-    values (v_channel_id, v_sequence, v_filename, v_original_filename)
-    returning id into v_id;
+    insert into image_frame(channel_id, msec, filename, original_filename, status)
+    values (v_channel_id, v_msec, uuid_generate_v4(), v_original_filename, 'scanned');
 
 end;
 $$;
 
 
-ALTER FUNCTION public.insert_image(v_directory text, v_original_filename text, v_channel_number integer, v_channel_name text, v_filename uuid, v_sequence integer, OUT v_id bigint) OWNER TO phoebeadmin;
+ALTER FUNCTION public.insert_image(v_directory text, v_original_filename text, v_channel_number integer, v_channel_name text, v_msec integer) OWNER TO phoebeadmin;
+
+--
+-- Name: insert_path(text); Type: FUNCTION; Schema: public; Owner: phoebeadmin
+--
+
+CREATE FUNCTION insert_path(v_path text) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+declare
+    v_regex_result text[];
+    v_directory text;
+    v_filename text;
+    v_channel integer;
+    v_msec integer;
+begin
+    v_regex_result := regexp_matches(v_path,'(.*)(?:\/)(.*)');
+    v_directory := v_regex_result[1];
+    v_filename := v_regex_result[2];
+    v_channel := (regexp_matches(v_filename,'(?:_ch)([0-9]+)(?:_)'))[1]::integer;
+    v_msec := (regexp_matches(v_filename,'(?:_)([0-9]+)(?:msec_)'))[1]::integer;
+    perform insert_image(v_directory, v_filename, v_channel, null, v_msec);
+end;
+$$;
+
+
+ALTER FUNCTION public.insert_path(v_path text) OWNER TO phoebeadmin;
+
+--
+-- Name: next_image(); Type: FUNCTION; Schema: public; Owner: phoebeadmin
+--
+
+CREATE FUNCTION next_image(OUT v_id bigint, OUT v_directory text, OUT v_original_filename text, OUT v_filename text) RETURNS record
+    LANGUAGE plpgsql
+    AS $$
+begin
+    update image_frame f set status = 'processing'
+    from image_view iv
+    where f.id = (
+        select id from image_frame
+        where status = 'scanned'
+        order by id limit 1 for update
+    )
+    and f.id = iv.id
+    returning f.id, iv.directory, f.original_filename, f.filename
+    into v_id, v_directory, v_original_filename, v_filename;
+end;
+$$;
+
+
+ALTER FUNCTION public.next_image(OUT v_id bigint, OUT v_directory text, OUT v_original_filename text, OUT v_filename text) OWNER TO phoebeadmin;
 
 SET default_tablespace = '';
 
@@ -165,9 +230,13 @@ ALTER SEQUENCE experiment_id_seq OWNED BY experiment.id;
 CREATE TABLE image_frame (
     id bigint NOT NULL,
     channel_id bigint NOT NULL,
-    sequence integer NOT NULL,
+    msec integer NOT NULL,
     filename uuid NOT NULL,
-    original_filename text
+    original_filename text,
+    status text,
+    width integer,
+    height integer,
+    depth integer
 );
 
 
@@ -193,6 +262,26 @@ ALTER TABLE image_frame_id_seq OWNER TO phoebeadmin;
 
 ALTER SEQUENCE image_frame_id_seq OWNED BY image_frame.id;
 
+
+--
+-- Name: image_view; Type: VIEW; Schema: public; Owner: phoebeadmin
+--
+
+CREATE VIEW image_view AS
+ SELECT e.directory,
+    c.channel_number,
+    f.msec,
+    f.original_filename,
+    f.filename,
+    f.id
+   FROM experiment e,
+    channel c,
+    image_frame f
+  WHERE ((e.id = c.experiment_id) AND (c.id = f.channel_id))
+  ORDER BY e.directory, c.channel_number, f.msec;
+
+
+ALTER TABLE image_view OWNER TO phoebeadmin;
 
 --
 -- Name: channel id; Type: DEFAULT; Schema: public; Owner: phoebeadmin
@@ -263,10 +352,10 @@ CREATE UNIQUE INDEX channel_id_channel_number_idx ON channel USING btree (id, ch
 
 
 --
--- Name: image_frame_channel_id_sequence_idx; Type: INDEX; Schema: public; Owner: phoebeadmin
+-- Name: image_frame_channel_id_msec_idx; Type: INDEX; Schema: public; Owner: phoebeadmin
 --
 
-CREATE UNIQUE INDEX image_frame_channel_id_sequence_idx ON image_frame USING btree (channel_id, sequence);
+CREATE UNIQUE INDEX image_frame_channel_id_msec_idx ON image_frame USING btree (channel_id, msec);
 
 
 --
@@ -283,6 +372,62 @@ ALTER TABLE ONLY channel
 
 ALTER TABLE ONLY image_frame
     ADD CONSTRAINT image_frame_channel_id_fkey FOREIGN KEY (channel_id) REFERENCES channel(id) ON DELETE CASCADE;
+
+
+--
+-- Name: channel; Type: ACL; Schema: public; Owner: phoebeadmin
+--
+
+GRANT SELECT,INSERT ON TABLE channel TO dataimport;
+
+
+--
+-- Name: channel_id_seq; Type: ACL; Schema: public; Owner: phoebeadmin
+--
+
+GRANT ALL ON SEQUENCE channel_id_seq TO dataimport;
+
+
+--
+-- Name: experiment; Type: ACL; Schema: public; Owner: phoebeadmin
+--
+
+GRANT SELECT,INSERT ON TABLE experiment TO dataimport;
+
+
+--
+-- Name: experiment_id_seq; Type: ACL; Schema: public; Owner: phoebeadmin
+--
+
+GRANT ALL ON SEQUENCE experiment_id_seq TO dataimport;
+
+
+--
+-- Name: image_frame; Type: ACL; Schema: public; Owner: phoebeadmin
+--
+
+GRANT SELECT,INSERT ON TABLE image_frame TO dataimport;
+
+
+--
+-- Name: image_frame.status; Type: ACL; Schema: public; Owner: phoebeadmin
+--
+
+GRANT UPDATE(status) ON TABLE image_frame TO dataimport;
+
+
+--
+-- Name: image_frame_id_seq; Type: ACL; Schema: public; Owner: phoebeadmin
+--
+
+GRANT ALL ON SEQUENCE image_frame_id_seq TO dataimport;
+
+
+--
+-- Name: image_view; Type: ACL; Schema: public; Owner: phoebeadmin
+--
+
+GRANT SELECT ON TABLE image_view TO dataimport;
 
 
 --

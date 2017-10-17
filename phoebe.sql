@@ -45,20 +45,39 @@ COMMENT ON EXTENSION "uuid-ossp" IS 'generate universally unique identifiers (UU
 SET search_path = public, pg_catalog;
 
 --
--- Name: complete_image(bigint); Type: FUNCTION; Schema: public; Owner: phoebeadmin
+-- Name: complete_image(bigint, integer, integer, integer); Type: FUNCTION; Schema: public; Owner: phoebeadmin
 --
 
-CREATE FUNCTION complete_image(v_id bigint) RETURNS void
+CREATE FUNCTION complete_image(v_id bigint, v_width integer, v_height integer, v_depth integer) RETURNS void
     LANGUAGE plpgsql
     AS $$
 begin
-    update image_frame set status = 'complete'
+    update image_frame
+    set (status, width, height, depth) = 
+    ('complete', v_width, v_height, v_depth)
     where id = v_id;
 end;
 $$;
 
 
-ALTER FUNCTION public.complete_image(v_id bigint) OWNER TO phoebeadmin;
+ALTER FUNCTION public.complete_image(v_id bigint, v_width integer, v_height integer, v_depth integer) OWNER TO phoebeadmin;
+
+--
+-- Name: end_log(bigint, text, bigint, text); Type: FUNCTION; Schema: public; Owner: phoebeadmin
+--
+
+CREATE FUNCTION end_log(v_id bigint, v_type text, v_f_key bigint, v_message text) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+begin
+    update log set
+    (end_time, type, f_key, message) = (current_timestamp, v_type, v_f_key, v_message::jsonb)
+    where id = v_id;
+end;
+$$;
+
+
+ALTER FUNCTION public.end_log(v_id bigint, v_type text, v_f_key bigint, v_message text) OWNER TO phoebeadmin;
 
 --
 -- Name: insert_image(text, text, integer, text, integer); Type: FUNCTION; Schema: public; Owner: phoebeadmin
@@ -150,6 +169,21 @@ $$;
 
 
 ALTER FUNCTION public.next_image(OUT v_id bigint, OUT v_directory text, OUT v_original_filename text, OUT v_filename text) OWNER TO phoebeadmin;
+
+--
+-- Name: start_log(); Type: FUNCTION; Schema: public; Owner: phoebeadmin
+--
+
+CREATE FUNCTION start_log(OUT v_id bigint) RETURNS bigint
+    LANGUAGE plpgsql
+    AS $$
+begin
+    insert into log (start_time) values (current_timestamp) returning id into v_id;
+end;
+$$;
+
+
+ALTER FUNCTION public.start_log(OUT v_id bigint) OWNER TO phoebeadmin;
 
 SET default_tablespace = '';
 
@@ -284,6 +318,43 @@ CREATE VIEW image_view AS
 ALTER TABLE image_view OWNER TO phoebeadmin;
 
 --
+-- Name: log; Type: TABLE; Schema: public; Owner: phoebeadmin
+--
+
+CREATE TABLE log (
+    id bigint NOT NULL,
+    start_time timestamp with time zone,
+    end_time timestamp with time zone,
+    type text,
+    f_key bigint,
+    message jsonb
+);
+
+
+ALTER TABLE log OWNER TO phoebeadmin;
+
+--
+-- Name: log_id_seq; Type: SEQUENCE; Schema: public; Owner: phoebeadmin
+--
+
+CREATE SEQUENCE log_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE log_id_seq OWNER TO phoebeadmin;
+
+--
+-- Name: log_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: phoebeadmin
+--
+
+ALTER SEQUENCE log_id_seq OWNED BY log.id;
+
+
+--
 -- Name: channel id; Type: DEFAULT; Schema: public; Owner: phoebeadmin
 --
 
@@ -302,6 +373,13 @@ ALTER TABLE ONLY experiment ALTER COLUMN id SET DEFAULT nextval('experiment_id_s
 --
 
 ALTER TABLE ONLY image_frame ALTER COLUMN id SET DEFAULT nextval('image_frame_id_seq'::regclass);
+
+
+--
+-- Name: log id; Type: DEFAULT; Schema: public; Owner: phoebeadmin
+--
+
+ALTER TABLE ONLY log ALTER COLUMN id SET DEFAULT nextval('log_id_seq'::regclass);
 
 
 --
@@ -342,6 +420,14 @@ ALTER TABLE ONLY image_frame
 
 ALTER TABLE ONLY image_frame
     ADD CONSTRAINT image_frame_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: log log_pkey; Type: CONSTRAINT; Schema: public; Owner: phoebeadmin
+--
+
+ALTER TABLE ONLY log
+    ADD CONSTRAINT log_pkey PRIMARY KEY (id);
 
 
 --
@@ -417,6 +503,27 @@ GRANT UPDATE(status) ON TABLE image_frame TO dataimport;
 
 
 --
+-- Name: image_frame.width; Type: ACL; Schema: public; Owner: phoebeadmin
+--
+
+GRANT UPDATE(width) ON TABLE image_frame TO dataimport;
+
+
+--
+-- Name: image_frame.height; Type: ACL; Schema: public; Owner: phoebeadmin
+--
+
+GRANT UPDATE(height) ON TABLE image_frame TO dataimport;
+
+
+--
+-- Name: image_frame.depth; Type: ACL; Schema: public; Owner: phoebeadmin
+--
+
+GRANT UPDATE(depth) ON TABLE image_frame TO dataimport;
+
+
+--
 -- Name: image_frame_id_seq; Type: ACL; Schema: public; Owner: phoebeadmin
 --
 
@@ -428,6 +535,20 @@ GRANT ALL ON SEQUENCE image_frame_id_seq TO dataimport;
 --
 
 GRANT SELECT ON TABLE image_view TO dataimport;
+
+
+--
+-- Name: log; Type: ACL; Schema: public; Owner: phoebeadmin
+--
+
+GRANT SELECT,INSERT,UPDATE ON TABLE log TO dataimport;
+
+
+--
+-- Name: log_id_seq; Type: ACL; Schema: public; Owner: phoebeadmin
+--
+
+GRANT SELECT,UPDATE ON SEQUENCE log_id_seq TO dataimport;
 
 
 --

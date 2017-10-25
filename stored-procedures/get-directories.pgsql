@@ -12,10 +12,8 @@ $$
                         select array_to_json(array_agg(row_to_json(s)))
                         from (
                                 select seg_value as value
-                                from segmentation as s, image_frame as if
-                                where s.frame_id = if.id
-                                and if.channel_id = c.id
-                                and s.status = 'complete'
+                                from segmentation as s
+                                where s.channel_id = c.id                                
                                 order by s.seg_value
                         ) as s
                     ) as segValues

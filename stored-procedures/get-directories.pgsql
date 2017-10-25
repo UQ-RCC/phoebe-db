@@ -1,5 +1,7 @@
+DROP FUNCTION get_directories(text);
+
 create or replace function get_directories(v_directory text default null)
-returns table(id bigint, directory text, frame_count bigint, channels json) as
+returns table(id bigint, directory text, frames bigint, channels json) as
 $$
         select e.id as id, e.directory as directory, max(fc.frames) as frames,
         (

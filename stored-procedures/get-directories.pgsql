@@ -7,7 +7,7 @@ $$
         (
             select array_to_json(array_agg(row_to_json(c)))
             from (
-                    select c.channel_number, c.name,
+                    select c.id, c.channel_number, c.name,
                     (
                         select array_to_json(array_agg(row_to_json(s)))
                         from (

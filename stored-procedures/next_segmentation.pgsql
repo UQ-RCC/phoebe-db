@@ -1,12 +1,13 @@
+drop function next_segmentation();
+
 create or replace function next_segmentation(
+    out v_segmentation_frame_id bigint,
     out v_filename text,
     out v_seg_value double precision,
     out v_width integer,
     out v_height integer,
     out v_depth integer) as
-$$
-declare
-    v_segmentation_frame_id bigint;
+$$    
 begin
     update segmentation_frame
     set status = 'processing'

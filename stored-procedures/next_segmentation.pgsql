@@ -25,7 +25,6 @@ begin
     where sf.id = v_segmentation_frame_id
     and sf.segmentation_id = s.id
     and sf.image_frame_id = if.id;
-
 end;
 $$
 language plpgsql;

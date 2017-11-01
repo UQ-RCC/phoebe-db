@@ -11,7 +11,7 @@ $$
                     (
                         select array_to_json(array_agg(row_to_json(s)))
                         from (
-                                select seg_value as value
+                                select s.id, s.seg_value as value
                                 from segmentation as s
                                 where s.channel_id = c.id                                
                                 order by s.seg_value

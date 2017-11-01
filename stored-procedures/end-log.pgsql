@@ -5,7 +5,7 @@ create or replace function end_log(
     in v_message text
 ) returns void as
 $$
-begin
+begin    
     update log set
     (end_time, type, f_key, message) = (current_timestamp, v_type, v_f_key, v_message::jsonb)
     where id = v_id;

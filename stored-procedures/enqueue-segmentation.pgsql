@@ -1,7 +1,7 @@
 create or replace function enqueue_segmentation_job(
     in v_channel_id integer,
-    in v_seg_value double precision
-    out v_segmentation_id bigint) returns void as
+    in v_seg_value double precision,
+    out v_segmentation_id bigint) as
 $$
 begin
 

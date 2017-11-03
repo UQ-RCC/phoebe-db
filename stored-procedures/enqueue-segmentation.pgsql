@@ -1,10 +1,10 @@
 create or replace function enqueue_segmentation_job(
-    v_channel_id integer,
-    v_seg_value double precision) returns void as
+    in v_channel_id integer,
+    in v_seg_value double precision
+    out v_segmentation_id bigint) returns void as
 $$
-declare
-    v_segmentation_id bigint;
 begin
+
     insert into segmentation(channel_id, seg_value)
     values (v_channel_id, v_seg_value)
     returning id into v_segmentation_id;

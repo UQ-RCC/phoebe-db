@@ -13,9 +13,10 @@ begin
     where id = v_segmentation_frame_id;
 
     select to_jsonb(m) into v_message from
-    (select id as segmentation_frame_id, segmentation_id, status
-    from segmentation_frame
-    where id = v_segmentation_frame_id) as m;
+    (select s.channel_id, sf.segmentation_id, sf.id as segmentation_frame_id, sf.status
+    from segmentation_frame as sf, segmentation s
+    where sf.segmentation_id = s.id
+    and sf.id = v_segmentation_frame_id) as m;
 
     perform pg_notify('proc_status', v_message::text);
 

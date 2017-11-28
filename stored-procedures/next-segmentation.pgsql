@@ -13,9 +13,11 @@ begin
     update segmentation_frame
     set status = 'processing'
     where(id) = (
-        select id from segmentation_frame
-        where status = 'queued'
-        order by id
+        select sf.id
+        from segmentation_frame sf, image_frame i        
+        where sf.status = 'queued'
+        and sf.image_frame_id = i.id
+        order by i.msec
         limit 1 for update
     )
     returning id into v_segmentation_frame_id;

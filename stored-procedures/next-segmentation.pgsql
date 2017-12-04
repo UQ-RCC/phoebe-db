@@ -14,7 +14,7 @@ begin
     set status = 'processing'
     where(id) = (
         select sf.id
-        from segmentation_frame sf, image_frame i        
+        from segmentation_frame sf, image_frame i
         where sf.status = 'queued'
         and sf.image_frame_id = i.id
         order by i.msec

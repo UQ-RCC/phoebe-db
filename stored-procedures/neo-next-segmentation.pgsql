@@ -25,6 +25,7 @@ begin
         where sf.segmentation_id = s.id
         and s.channel_id = c.id        
         and sf.status = 'queued'
+        and s.current_frame is not null
         order by s.priority desc nulls last, shift(coalesce(sf.frame_number, 0), s.current_frame, c.frame_count)
         limit 1 for update
     )

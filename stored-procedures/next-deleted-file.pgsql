@@ -1,6 +1,6 @@
 create or replace function next_deleted_file(
-    inout v_filename text default null,
-    in v_status text default null
+    inout v_filename text,
+    in v_status text    
 ) as
 $$
 begin
